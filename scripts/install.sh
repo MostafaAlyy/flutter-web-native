@@ -10,7 +10,9 @@ SKILL_NAME="flutter-web-native"
 echo "Installing skill '$SKILL_NAME' from: $SKILL_DIR"
 
 INSTALL_TARGETS=(
+  "$HOME/.config/opencode/skills/$SKILL_NAME"
   "$HOME/.agents/skills/$SKILL_NAME"
+  "$HOME/.claude/skills/$SKILL_NAME"
   "$HOME/.gemini/antigravity/global_skills/$SKILL_NAME"
   "$HOME/.gemini/skills/$SKILL_NAME"
 )

@@ -1,3 +1,11 @@
+// NOTE (recommended alternative): this `ScrollController`-level smoother
+// restarts `animateTo` on every wheel tick, which is fine for a mouse but
+// produces competing animations on a trackpad (dozens of events/second).
+//
+// Prefer `examples/smooth_wheel_scroll.dart`, which coalesces deltas into one
+// time-based eased target and wires itself up as a drop-in widget. Keep this
+// file only if you specifically want smoothing without adding a widget.
+
 import 'dart:math' as math;
 import 'package:flutter/widgets.dart';
 

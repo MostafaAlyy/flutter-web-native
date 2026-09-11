@@ -130,6 +130,12 @@ class SmoothScrollPosition extends ScrollPositionWithSingleContext {
 
 ---
 
+> **Reality check (Flutter 3.4x).** There is **no global first-party hook** for smooth wheel scrolling. `ScrollBehavior` exposes `dragDevices`, `getScrollPhysics`, `buildScrollbar`, `buildOverscrollIndicator`, and `pointerAxisModifiers` — none of them can rewrite a wheel delta. The framework calls `position.pointerScroll(delta)` synchronously, and on the web **trackpad and mouse wheel share that same pointer-signal path**.
+>
+> The `animateTo`-per-event approach above is the *simple* version. On a trackpad (dozens of events per second) it starts dozens of competing animations. The robust pattern is to **coalesce deltas into one target and ease a single ticker toward it**, time-based (not tick-based) so a throttled low-end device still settles quickly. See `examples/smooth_scroll_controller.dart` for a production version, and only apply it to `PointerDeviceKind.mouse` if you also want to leave macOS inertial trackpad deltas untouched.
+>
+> Reduced motion is already handled for you: `MediaQuery.disableAnimations` mirrors `prefers-reduced-motion` on web, so gate smoothing on it rather than reading `matchMedia` yourself.
+
 ## 2. Mouse Dragging vs. Text Selection Conflict
 
 ### The Fatal Web Mistake: Adding `mouse` to `dragDevices`

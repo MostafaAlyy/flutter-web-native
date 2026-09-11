@@ -13,28 +13,27 @@ Flutter automatically generates a `manifest.json` in the `web/` folder. This fil
 
 ## 2. Service Workers and Caching
 
-Flutter injects a `flutter_service_worker.js`. By default, this caches `main.dart.js`, `canvaskit.wasm`, and your `AssetManifest.json`.
+> **Reality check.** Flutter no longer generates or manages a service worker by default. Older tutorials (and stale `web/flutter_service_worker.js` files left in a repo) are obsolete. You now **bring your own** worker with standard web tooling (e.g. **Workbox**) or a hand-written `sw.js`.
 
-### Customizing the Service Worker
-If you need to cache API responses or specific images for offline use, you must modify or wrap the default service worker.
+The `{{flutter_service_worker_version}}` token still exists in `flutter_bootstrap.js` so a custom worker can key its caches to the current build. Use it:
 
-In `web/index.html`:
-```javascript
-// Registering a custom service worker that imports the flutter one
-navigator.serviceWorker.register('/my_custom_worker.js');
+```js
+// web/my_custom_worker.js
+importScripts('flutter_service_worker.js'); // if you keep a generated shim
+// + your own fetch handlers
 ```
 
-In `web/my_custom_worker.js`:
-```javascript
-importScripts('flutter_service_worker.js');
+Prefer a **Network-First** strategy for HTML/app entrypoints (so a deploy is picked up on the next load) and **Cache-First** for hashed assets (`main.dart.js`, `canvaskit.wasm`, fonts, images) whose names change per build.
 
-// Add your own fetch event listeners for API caching
-self.addEventListener('fetch', (event) => {
-  if (event.request.url.includes('/api/v1/')) {
-    // Implement Stale-While-Revalidate or Network-First caching
-  }
-});
+### Cache-Control headers (as important as the worker)
+For Flutter web on a static host, cache-control matters as much as the SW. A proven recipe (Firebase Hosting):
+
+```json
+{ "source": "**/*.@(mjs|js|wasm|json)", "headers": [{ "key": "Cache-Control", "value": "max-age=0,s-maxage=604800" }] }
+{ "source": "**/*.@(png|jpg|jpeg|webp|svg|woff2)", "headers": [{ "key": "Cache-Control", "value": "max-age=3600,s-maxage=604800" }] }
 ```
+
+Never serve `*.map` source maps publicly in production.
 
 ## 3. Handling Offline State in Dart
 

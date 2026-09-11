@@ -1,24 +1,29 @@
 # Web Renderers, Wasm, & Memory Management
 
-Flutter Web is not a traditional DOM-based framework. It fundamentally renders to a `<canvas>` (or uses DOM nodes defensively in HTML mode). Understanding the rendering targets is critical for native performance and memory management.
+Flutter Web is not a traditional DOM-based framework. It renders to a `<canvas>`. Understanding the rendering targets is critical for native performance and memory management.
 
-## 1. The Three Renderers
+> **Reality check (Flutter 3.29+).** The **HTML renderer was removed** and the **`--web-renderer` flag was removed**. Do not write guidance around them. Today there are two real builds: default `dart2js + CanvasKit`, and opt-in `--wasm` (Skwasm).
 
-### WebAssembly (Wasm) - The Future (Flutter 3.22+)
-- **Compilation**: `flutter build web --wasm`
-- **Mechanism**: Compiles Dart code to WasmGC (WebAssembly Garbage Collection).
-- **Benefits**: Near-native execution speed, significantly reduced frame rendering times, better memory management because it shares the JavaScript engine's GC directly rather than implementing a GC inside Wasm memory.
-- **Drawbacks**: Requires modern browsers supporting WasmGC (Chrome 119+, Firefox 120+, Safari 17.4+).
+## 1. Renderers
 
-### CanvasKit (Default for Desktop Web)
-- **Mechanism**: Bundles a WebAssembly version of Skia (or Impeller) to draw directly to a `<canvas>`.
-- **Benefits**: 100% fidelity with mobile/desktop Flutter. Text shaping, shadows, and paths match exactly.
-- **Drawbacks**: Initial download payload includes the CanvasKit Wasm binary (~1.5MB - 2MB compressed). Can suffer from memory leaks if unused images/canvases are not properly disposed.
+| Build command | Renderer | Notes |
+| --- | --- | --- |
+| `flutter build web` (default) | dart2js + **CanvasKit** | Widest browser support. CanvasKit download ≈1.5–2 MB. |
+| `flutter build web --wasm` | **Skwasm** (WasmGC) + dart2js/CanvasKit fallback | Best runtime performance; needs WasmGC (Chrome 119+, Firefox 120+, Safari 17.4+). |
+| HTML renderer | ❌ removed | Gone since Flutter 3.29. |
 
-### HTML Renderer (Deprecated / Legacy)
-- **Mechanism**: Uses HTML elements, CSS, Canvas 2D, and SVG elements.
-- **Benefits**: Smaller download size.
-- **Drawbacks**: Inconsistent rendering across browsers, poorer performance for complex animations, clipping/shadow limitations. **Avoid for production "app-like" experiences.**
+Current web build flags: `--wasm`, `--[no-]source-maps`, `--[no-]strip-wasm`, `--[no-]wasm-dry-run`.
+
+Detect the runtime at compile time:
+
+```dart
+const isRunningWithWasm = bool.fromEnvironment('dart.tool.dart2wasm');
+```
+
+### Wasm caveats that bite production
+- **Multithreaded Skwasm requires cross-origin isolation**: `Cross-Origin-Embedder-Policy: credentialless` (or `require-corp`) **and** `Cross-Origin-Opener-Policy: same-origin`. If you cannot set those — e.g. they break a cross-origin iframe player — set `forceSingleThreadedSkwasm: true` in the `flutter_bootstrap.js` config instead.
+- **No Wasm on iOS**: every iOS browser is WebKit and lacks WasmGC. Keep emitting the dart2js fallback build.
+- The loader's default wasm allow-list is `{blink:true, gecko:false, webkit:false, unknown:false}`. Pinning `renderer` in the loader config can make the loader reject the built artifact and leave users stuck on the splash; prefer letting the loader choose, or ship both builds.
 
 ## 2. Optimizing Initial Load Time
 

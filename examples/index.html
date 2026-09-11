@@ -6,17 +6,20 @@
   <meta content="IE=Edge" http-equiv="X-UA-Compatible">
   <meta name="description" content="A production Flutter Web application.">
 
-  <!-- Responsive Viewport without zoom lockouts -->
+  <!-- Responsive viewport WITHOUT zoom lockouts. Flutter's engine injects its own
+       tag (width=device-width, initial-scale=1.0, maximum-scale=5.0) and strips
+       user-scalable=no / maximum-scale=1 — shipping those only fails a11y audits. -->
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-  <!-- Web App Manifest & Theme Color -->
+  <!-- Web App Manifest, theme color, and (for RTL apps) lang/dir. The engine sets
+       language from the locale but never sets dir. -->
   <link rel="manifest" href="manifest.json">
   <meta name="theme-color" content="#121212">
 
   <title>App</title>
 
   <style>
-    /* Clean Reset: allow natural visual viewport panning and DPR scaling */
+    /* Clean reset: allow natural visual-viewport panning and DPR scaling. */
     html, body {
       margin: 0;
       padding: 0;
@@ -27,12 +30,16 @@
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
     }
 
-    /* Host Element Touch & Pointer Configuration */
+    /* Host element sizing. Opt into browser pinch-zoom ONLY — the engine already
+       owns single-finger panning (it sets touch-action: none on its scene host),
+       so granting pan-x/pan-y here causes double-scroll. If an in-app pinch
+       surface (PDF/InteractiveViewer) exists, omit this and let the engine own
+       gestures on those screens. */
     flutter-view {
       width: 100%;
       height: 100%;
       display: block;
-      touch-action: pan-x pan-y pinch-zoom;
+      touch-action: pinch-zoom;
     }
 
     /* CRITICAL: DO NOT add width/height overrides to "flutter-view canvas".

@@ -64,6 +64,13 @@ Never lock out zoom in `<meta name="viewport">`:
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 ```
 
+> **What the engine actually does (3.4x).** Flutter logs *"Found an existing `<meta name="viewport">` tag … This tag will be replaced"* and injects
+> `width=device-width, initial-scale=1.0, maximum-scale=5.0`. It deliberately does **not** ship `user-scalable=no`, to comply with WCAG. So a zoom-locking tag in your `index.html` is (a) ignored at runtime yet (b) still counted against you by Lighthouse/a11y audits. Delete it.
+>
+> Zoom is tracked through `visualViewport`, and the engine computes `devicePixelRatio = window.devicePixelRatio × visualViewport.scale`, so hit-testing stays accurate while zoomed (pointer positions come from `offsetX/Y` or `clientX/Y − getBoundingClientRect()`). Keep zoom enabled.
+>
+> If browser zoom feels wrong in *your* app, the cause is usually a CSS override on the canvas — not the viewport tag.
+
 ### Removing Body Overflow Locks
 If `body` has `overflow-x: hidden` or `overflow: hidden`, the browser freezes visual viewport panning. When a user zooms in with trackpad pinch or accessibility zoom, they cannot pan across the enlarged content:
 
@@ -93,11 +100,15 @@ By default, modern desktop and mobile browsers apply gesture disambiguation algo
 flutter-view {
   width: 100%;
   height: 100%;
-  touch-action: pan-x pan-y pinch-zoom;
+  /* Opt into browser pinch-zoom ONLY. Do not grant pan-x/pan-y here: the engine
+     already owns single-finger panning (it sets `touch-action: none` on its
+     scene host), and re-granting it to the browser causes double-scroll. */
+  touch-action: pinch-zoom;
 }
 ```
-- `pan-x pan-y`: Informs the browser that horizontal and vertical scrolling are handled naturally.
-- `pinch-zoom`: Signals that multi-touch pinch gestures should trigger native browser visual viewport scaling.
+- `pinch-zoom`: lets multi-touch pinch trigger native browser visual-viewport scaling while Flutter keeps single-finger panning.
+- **Tradeoff:** if your app has an in-app pinch surface (PDF reader, `InteractiveViewer`, image zoom), browser pinch-zoom can steal the gesture. Test those screens; scope `touch-action` to the routes that need browser zoom, or leave it to the engine.
+- Do **not** blanket-set `touch-action: pan-x pan-y pinch-zoom` on the canvas — that was the old advice and it fights Flutter's own gesture handling.
 
 ### Safari / WebKit Gesture Event Hooks
 iOS Safari and macOS Safari can trigger proprietary gesture events (`gesturestart`, `gesturechange`, `gestureend`) that conflict with canvas pointer dispatch:

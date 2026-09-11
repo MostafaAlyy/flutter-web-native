@@ -29,6 +29,8 @@ SelectionArea(
 )
 ```
 
+> **Platform-aware helper.** `desktopTextSelectionHandleControls` is a `const` from `package:flutter/material.dart`. Since it should only apply on web/desktop (not on touch), use `examples/app_text_selection.dart` (`appTextSelectionHandleControls`), which returns the desktop controls on web/desktop and `null` elsewhere so Flutter keeps the platform-correct touch handles.
+
 ---
 
 ## 2. Selection Isolation: Protecting Chrome and Controls
