@@ -13,7 +13,7 @@ YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
-echo -e "${BLUE}=== Flutter Web Native Fidelity Audit ===${NC}"
+echo -e "${BLUE}=== Flutter Web Native Fidelity Audit (100X Depth) ===${NC}"
 echo "Target: $TARGET_DIR"
 echo ""
 
@@ -39,7 +39,7 @@ check_warn() {
 
 INDEX_HTML="$TARGET_DIR/web/index.html"
 
-echo -e "${BLUE}[1/4] Checking HTML & CSS (web/index.html)...${NC}"
+echo -e "${BLUE}[1/5] Checking HTML & CSS (web/index.html)...${NC}"
 if [ -f "$INDEX_HTML" ]; then
   # 1. Viewport zoom lockout
   if grep -E "user-scalable\s*=\s*no|maximum-scale\s*=\s*1(\.0)?" "$INDEX_HTML" >/dev/null 2>&1; then
@@ -79,7 +79,7 @@ else
 fi
 
 echo ""
-echo -e "${BLUE}[2/4] Checking Scroll Architecture...${NC}"
+echo -e "${BLUE}[2/5] Checking Scroll Architecture...${NC}"
 
 # Check for mouse in dragDevices
 if grep -rnE "PointerDeviceKind\.mouse" "$TARGET_DIR/lib" >/dev/null 2>&1; then
@@ -103,7 +103,7 @@ else
 fi
 
 echo ""
-echo -e "${BLUE}[3/4] Checking Text Selection & Menus...${NC}"
+echo -e "${BLUE}[3/5] Checking Text Selection & Menus...${NC}"
 
 # Check for desktop text selection handles
 if grep -rnE "desktopTextSelectionHandleControls" "$TARGET_DIR/lib" >/dev/null 2>&1; then
@@ -132,7 +132,42 @@ else
 fi
 
 echo ""
-echo -e "${BLUE}[4/4] Checking URLs & Navigation...${NC}"
+echo -e "${BLUE}[4/5] Checking Advanced OS & Wasm Integrations...${NC}"
+
+# Memory management (CanvasKit)
+if grep -rnE "imageCache\.clear" "$TARGET_DIR/lib" >/dev/null 2>&1; then
+  check_pass "Image cache eviction found (good for CanvasKit memory limits)"
+else
+  check_warn "Memory Management" \
+    "No image cache clearing detected. Without calling PaintingBinding.instance.imageCache.clear(), CanvasKit web apps often crash on heavy image pages."
+fi
+
+# OS Clipboard / Drag-and-drop
+if grep -rnE "desktop_drop|super_clipboard" "$TARGET_DIR/lib" "$TARGET_DIR/pubspec.yaml" >/dev/null 2>&1; then
+  check_pass "Advanced OS clipboard/drag-drop integrations detected"
+else
+  check_warn "OS Integration" \
+    "Consider using 'desktop_drop' and 'super_clipboard' to support native file dragging and rich image pasting."
+fi
+
+# Autofill
+if grep -rnE "AutofillGroup|finishAutofillContext" "$TARGET_DIR/lib" >/dev/null 2>&1; then
+  check_pass "Password manager and autofill support detected"
+else
+  check_warn "Forms & Autofill" \
+    "No AutofillGroup found. Password managers won't properly autofill or prompt to save credentials on your web forms."
+fi
+
+# Concurrency / Isolates
+if grep -rnE "Isolate\.run|Isolate\.spawn|compute\(" "$TARGET_DIR/lib" >/dev/null 2>&1; then
+  check_pass "Concurrency methods found (Dart isolates / Web Workers used)"
+else
+  check_warn "Concurrency" \
+    "No Isolate.run() found. Heavy calculations on the main thread will cause visual stuttering on web."
+fi
+
+echo ""
+echo -e "${BLUE}[5/5] Checking URLs & Navigation...${NC}"
 
 # Check for usePathUrlStrategy
 if grep -rnE "usePathUrlStrategy" "$TARGET_DIR/lib" >/dev/null 2>&1; then
