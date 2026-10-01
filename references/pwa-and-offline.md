@@ -13,17 +13,18 @@ Flutter automatically generates a `manifest.json` in the `web/` folder. This fil
 
 ## 2. Service Workers and Caching
 
-> **Reality check.** Flutter no longer generates or manages a service worker by default. Older tutorials (and stale `web/flutter_service_worker.js` files left in a repo) are obsolete. You now **bring your own** worker with standard web tooling (e.g. **Workbox**) or a hand-written `sw.js`.
+> **Reality check (3.47).** Flutter no longer ships a caching service worker. `flutter build web` still writes a `flutter_service_worker.js`, but it is a **self-unregistering cleanup worker** for sites that used the old one (`flutter_tools/lib/src/web/file_generators/js/flutter_service_worker.js`); the hidden, deprecated `--pwa-strategy=none` writes an empty file. Older tutorials are obsolete. **Bring your own** worker with standard tooling (e.g. **Workbox**) or a hand-written `sw.js`, registered under a different file name.
 
-The `{{flutter_service_worker_version}}` token still exists in `flutter_bootstrap.js` so a custom worker can key its caches to the current build. Use it:
+The `{{flutter_service_worker_version}}` token still exists in `flutter_bootstrap.js` so a custom worker can key its caches to the current build:
 
 ```js
-// web/my_custom_worker.js
-importScripts('flutter_service_worker.js'); // if you keep a generated shim
-// + your own fetch handlers
+// web/flutter_bootstrap.js
+navigator.serviceWorker?.register('sw.js?v={{flutter_service_worker_version}}');
 ```
 
-Prefer a **Network-First** strategy for HTML/app entrypoints (so a deploy is picked up on the next load) and **Cache-First** for hashed assets (`main.dart.js`, `canvaskit.wasm`, fonts, images) whose names change per build.
+Never `importScripts('flutter_service_worker.js')` into your worker — the generated file unregisters the registration it runs in.
+
+Prefer a **Network-First** strategy for HTML/app entrypoints (so a deploy is picked up on the next load) and **Cache-First** only for assets whose names really change per build. `flutter build web` does **not** content-hash `main.dart.js` / `main.dart.wasm` / `main.dart.mjs`, deferred part files, or most `assets/` — cache-first on those serves a stale mix after a deploy unless you hash them at deploy time (see `loading-and-bootstrap.md`).
 
 ### Cache-Control headers (as important as the worker)
 For Flutter web on a static host, cache-control matters as much as the SW. A proven recipe (Firebase Hosting):
@@ -32,6 +33,8 @@ For Flutter web on a static host, cache-control matters as much as the SW. A pro
 { "source": "**/*.@(mjs|js|wasm|json)", "headers": [{ "key": "Cache-Control", "value": "max-age=0,s-maxage=604800" }] }
 { "source": "**/*.@(png|jpg|jpeg|webp|svg|woff2)", "headers": [{ "key": "Cache-Control", "value": "max-age=3600,s-maxage=604800" }] }
 ```
+
+(`s-maxage` lets the CDN cache until the next deploy invalidates it; browsers revalidate. Hosting `headers` rules also override `Cache-Control` set by a Cloud Function on the same path.)
 
 Never serve `*.map` source maps publicly in production.
 

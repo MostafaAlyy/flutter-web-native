@@ -1,6 +1,6 @@
 # Viewport, CSS & Canvas Engine Architecture
 
-Flutter Web renders its UI using either **Skwasm** (WebAssembly), **CanvasKit** (WebGL/Skia), or the legacy HTML renderer. Regardless of the engine, the fundamental boundary between the browser DOM and Flutter's rendering pipeline is the `<flutter-view>` host element and its nested `<canvas>`.
+Flutter Web renders its UI using either **Skwasm** (`--wasm` builds) or **CanvasKit** (the default dart2js build). The HTML renderer was removed in 3.29. Regardless of the engine, the fundamental boundary between the browser DOM and Flutter's rendering pipeline is the `<flutter-view>` host element and its nested `<canvas>`.
 
 Misconfiguring this DOM layer is the #1 reason Flutter web apps feel like blurry, un-zoomable video games rather than native web applications.
 
@@ -43,7 +43,8 @@ html, body {
 flutter-view {
   width: 100%;
   height: 100%;
-  touch-action: pan-x pan-y pinch-zoom;
+  /* Optional: opt into browser pinch-zoom only — see section 3 for the tradeoff. */
+  touch-action: pinch-zoom;
 }
 ```
 
@@ -126,6 +127,6 @@ document.addEventListener('gesturestart', function(e) {
 
 - [ ] Viewport meta tag does **not** contain `user-scalable=no` or `maximum-scale=1.0`.
 - [ ] No CSS rule applies `width` or `height` overrides directly to `flutter-view canvas`.
-- [ ] `<flutter-view>` has `touch-action: pan-x pan-y pinch-zoom;`.
+- [ ] `touch-action` is a deliberate choice: `pinch-zoom` only (never `pan-x pan-y`), or left to the engine on screens with in-app pinch surfaces.
 - [ ] `html, body` has no `overflow-x: hidden;` lockouts.
 - [ ] Favicon, web app manifest, theme-color meta tag, and OpenGraph headers are configured.

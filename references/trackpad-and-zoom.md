@@ -98,8 +98,8 @@ class _NativeZoomableStageState extends State<NativeZoomableStage> {
       child: ClipRect(
         child: Transform(
           transform: Matrix4.identity()
-            ..translate(_pan.dx, _pan.dy)
-            ..scale(_scale),
+            ..translateByDouble(_pan.dx, _pan.dy, 0, 1)
+            ..scaleByDouble(_scale, _scale, 1, 1),
           child: widget.child,
         ),
       ),

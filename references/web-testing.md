@@ -61,7 +61,11 @@ For real-browser concerns — the semantics DOM, `BrowserContextMenu`, COOP/COEP
 - `document.title` and meta tags,
 - scroll/URL via the History API.
 
-## 5. What to cover before shipping a web-facing change
+## 5. Performance tests are a different rig
+
+Functional browser tests don't tell you about frame cost or boot time. Use the measurement playbook in `performance-measurement.md` and `scripts/perf_probe.py`: SwiftShader headless (rAF fps there is meaningless — compare main-thread ms per frame and long-animation-frame blocking time), TTFF from the `flutter-first-frame` event, baseline vs change built into separate directories and served with `scripts/prod_serve.py` (brotli + prod cache headers), runs sequential and repeated.
+
+## 6. What to cover before shipping a web-facing change
 
 - [ ] Mouse can select text (drag) and the wheel scrolls.
 - [ ] Right-click shows the native menu (or is deliberately suppressed for a documented reason).
@@ -70,3 +74,4 @@ For real-browser concerns — the semantics DOM, `BrowserContextMenu`, COOP/COEP
 - [ ] Real device sizes: narrow phone, large phone, tablet/desktop, browser zoom 125–200%.
 - [ ] Arabic/RTL and long text do not clip; dark and light both checked.
 - [ ] A performance trace in DevTools shows no long tasks >50ms on the hot path.
+- [ ] Idle page schedules no frames; scroll ms/frame and TTFF not regressed vs baseline (`perf_probe.py`).

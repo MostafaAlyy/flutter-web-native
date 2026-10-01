@@ -3,7 +3,6 @@
 <head>
   <base href="$FLUTTER_BASE_HREF">
   <meta charset="UTF-8">
-  <meta content="IE=Edge" http-equiv="X-UA-Compatible">
   <meta name="description" content="A production Flutter Web application.">
 
   <!-- Responsive viewport WITHOUT zoom lockouts. Flutter's engine injects its own
@@ -18,6 +17,20 @@
 
   <title>App</title>
 
+  <!-- Critical-path preloads. Keep <head> to link/style/script/meta/title only:
+       any other element (div, img, picture) closes <head> early and pushes the
+       rest of it — CSP meta included — into <body>.
+       Generate these at build/deploy time; never hand-maintain versions:
+       - Blink + WasmGC gets dart2wasm + Skwasm by default (flutter.js
+         wasmAllowList), so preload that path; dart2js stays a classic script.
+       - Firebase JS SDK bundles that main() awaits (bare modulepreload, no
+         crossorigin), version from firebase_core_web's
+         supportedFirebaseJsSdkVersion. -->
+  <link rel="modulepreload" href="main.dart.mjs">
+  <link rel="preload" href="main.dart.wasm" as="fetch" crossorigin="anonymous">
+  <link rel="preload" href="assets/FontManifest.json" as="fetch" crossorigin="anonymous">
+  <link rel="preconnect" href="https://www.gstatic.com" crossorigin>
+
   <style>
     /* Clean reset: allow natural visual-viewport panning and DPR scaling. */
     html, body {
@@ -31,8 +44,8 @@
     }
 
     /* Host element sizing. Opt into browser pinch-zoom ONLY — the engine already
-       owns single-finger panning (it sets touch-action: none on its scene host),
-       so granting pan-x/pan-y here causes double-scroll. If an in-app pinch
+       owns single-finger panning (it sets touch-action: none on its host), so
+       granting pan-x/pan-y here causes double-scroll. If an in-app pinch
        surface (PDF/InteractiveViewer) exists, omit this and let the engine own
        gestures on those screens. */
     flutter-view {
@@ -42,19 +55,30 @@
       touch-action: pinch-zoom;
     }
 
+    #splash {
+      position: fixed;
+      inset: 0;
+      display: grid;
+      place-items: center;
+    }
+
     /* CRITICAL: DO NOT add width/height overrides to "flutter-view canvas".
        Doing so overrides Flutter's devicePixelRatio buffer calculation
        and causes blurry text and offset mouse click coordinates. */
   </style>
 
-  <script>
-    // Prevent Safari gesture conflicts while maintaining native pinch zoom
-    document.addEventListener('gesturestart', function(e) {
-      // Passive listener allowing visual viewport gestures
-    }, { passive: true });
-  </script>
+  <!-- App-wide smooth mouse-wheel easing (examples/smooth_wheel_shim.js).
+       Deferred: it only has to be live by the first wheel event. -->
+  <script src="smooth_wheel_shim.js" defer></script>
 </head>
 <body>
+  <!-- The splash image is the page's LCP element: explicit width/height (1x
+       intrinsic size) and fetchpriority="high"; no decoding="async" or
+       loading="lazy". Removed on the flutter-first-frame event. -->
+  <div id="splash" aria-hidden="true">
+    <img src="splash/logo.png" srcset="splash/logo.png 1x, splash/logo@2x.png 2x"
+         width="160" height="160" fetchpriority="high" alt="">
+  </div>
   <script src="flutter_bootstrap.js" async></script>
 </body>
 </html>

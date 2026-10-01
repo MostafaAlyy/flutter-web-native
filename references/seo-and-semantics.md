@@ -108,3 +108,12 @@ Title(
   child: MyScreen(),
 )
 ```
+
+## 3. Crawler, Lighthouse & agent discovery files
+
+These are host files, but they fail audits in Flutter-specific ways because an SPA fallback answers every unknown URL with the app shell:
+- **robots.txt**: only standard directives (`User-agent`, `Allow`, `Disallow`, `Sitemap`, …). Non-standard hints such as `LLM-Txt:` fail Lighthouse's robots-txt audit — write them as `#` comments.
+- **`/.well-known/*`**: return a real file or a 404, never `index.html`. Lighthouse 13.5's agentic-browsing `ard-schema` audit fetches `/.well-known/ai-catalog.json` (after checking robots `Agentmap:`, `<link rel="ai-catalog">` and a `Link` header); an HTML answer fails it. A valid catalog with empty entries passes.
+- **Source maps**: a `sourceMappingURL` pointing at a file you don't deploy gets HTML back from the SPA fallback (valid-source-maps failure).
+
+Details and fixes: `loading-and-bootstrap.md` §7.

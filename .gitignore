@@ -11,3 +11,6 @@
 .dart_tool/
 .packages
 build/
+
+# Python
+__pycache__/

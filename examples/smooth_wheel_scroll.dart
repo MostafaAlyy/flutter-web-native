@@ -118,6 +118,11 @@ class SmoothWheelScroller {
 /// ```
 ///
 /// Behavior notes:
+/// - If the page-level shim (`examples/smooth_wheel_shim.js`) is installed it
+///   already eases every wheel notch; set [SmoothWheelScroll.pageShimActive]
+///   at startup so this widget stands down instead of easing twice. Do NOT
+///   try to detect that by `PointerDeviceKind`: the shim's slices carry the
+///   notch's `wheelDelta`, so the engine labels them `mouse` like a real one.
 /// - Registers with [GestureBinding.pointerSignalResolver] so it wins over the
 ///   inner [Scrollable]'s default (instant) wheel handling.
 /// - Respects reduced motion: when `MediaQuery.disableAnimations` is true
@@ -137,6 +142,14 @@ class SmoothWheelScroll extends StatefulWidget {
   final Widget child;
   final double gain;
   final double smoothing;
+
+  /// Returns true when a page-level wheel shim is easing input already.
+  ///
+  /// Wire it once at startup from a conditional-import helper that reads
+  /// `window.__flutterSmoothWheel` via `dart:js_interop` (see
+  /// `references/scroll-architecture.md`). Defaults to "no shim".
+  static bool Function() pageShimActive = _noShim;
+  static bool _noShim() => false;
 
   @override
   State<SmoothWheelScroll> createState() => _SmoothWheelScrollState();
@@ -176,6 +189,8 @@ class _SmoothWheelScrollState extends State<SmoothWheelScroll>
     }
     // Respect reduced motion: fall back to the platform's instant wheel.
     if (MediaQuery.maybeOf(context)?.disableAnimations ?? false) return;
+    // The page-level shim already delivers eased sub-notch deltas.
+    if (SmoothWheelScroll.pageShimActive()) return;
 
     GestureBinding.instance.pointerSignalResolver.register(event, (event) {
       if (event is PointerScrollEvent) wheel.addDelta(event.scrollDelta.dy);
