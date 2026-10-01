@@ -119,7 +119,8 @@ By default Flutter Web treats the browser as a foreign rendering surface: it sup
 - Handle connectivity with a graceful banner, not raw socket errors.
 
 ### 11. Boot critical path & delivery
-- Nothing `main()` awaits before `runApp` may start its network only once Dart runs: modulepreload the Firebase JS SDK bundles (version + services generated from the resolved packages), or defer init past the first frame.
+- Nothing `main()` awaits before `runApp` may start its network only once Dart runs: modulepreload the Firebase JS SDK bundles **on Blink only** (version + services generated from the resolved packages; WebKit must keep FlutterFire's serial load order), or defer init past the first frame.
+- Ship a first-frame watchdog: once the binaries have downloaded, a boot that never paints within ~30 s of visible time recovers (purge + reload once) instead of leaving an endless splash.
 - No plugin wasm on the first screen that it doesn't use (e.g. don't call `pdfrxFlutterInitialize()` at boot on web).
 - Entry preloads mirror flutter.js renderer selection and fetch modes; trim `FontManifest.json` for web; only `<link>/<style>/<script>` injected into `<head>`.
 - Content-hash entrypoints for immutable caching; compress function-rendered HTML; sized `fetchpriority="high"` splash; no dangling `sourceMappingURL`; standard robots.txt; real `/.well-known/*` files or 404 (`loading-and-bootstrap.md`).

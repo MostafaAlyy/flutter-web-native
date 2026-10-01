@@ -591,19 +591,25 @@ if [ -n "$FB_CORE_ROOT" ] && [ -f "$FB_CORE_ROOT/lib/src/firebase_sdk_version.da
     done
   done
   FB_SRC=""
+  FB_STATIC=""
   for h in "$INDEX_HTML" "$BUILD_INDEX"; do
     [ -f "$h" ] || continue
-    if html_tag_stream "$h" | grep -Ei '^link[[:space:]]' | grep -i 'modulepreload' | grep -q 'gstatic\.com/firebasejs/'; then FB_SRC="$h"; break; fi
+    if html_tag_stream "$h" | grep -Ei '^link[[:space:]]' | grep -i 'modulepreload' | grep -q 'gstatic\.com/firebasejs/'; then FB_STATIC="$h"; fi
+    if [ -z "$FB_SRC" ] && grep -q 'gstatic\.com/firebasejs/' "$h"; then FB_SRC="$h"; fi
   done
+  if [ -n "$FB_STATIC" ]; then
+    check_warn "Firebase modulepreloads reach WebKit" \
+      "$(basename "$(dirname "$FB_STATIC")")/index.html has static <link rel=\"modulepreload\"> tags for the Firebase SDK. Static tags also run on Safari/iOS, where FlutterFire deliberately loads firebase-app.js before the service bundles (WebKit module-evaluation defect, flutterfire#18436); preloading them all at parse time reintroduces that concurrency. Inject them from the boot script's Blink/WasmGC branch instead."
+  fi
   if [ -z "$FB_SRC" ]; then
     check_warn "Firebase JS SDK modulepreloads" \
-      "firebase_core_web $FB_VERSION is used but neither web/index.html nor build/web/index.html modulepreloads its bundles. The SDK is import()ed only after the app's wasm runs (firebase-app.js strictly first); if main() awaits Firebase.initializeApp, that chain is on the first-frame path. Generate <link rel=\"modulepreload\" href=\"https://www.gstatic.com/firebasejs/$FB_VERSION/<bundle>\"> (no crossorigin) for: $FB_EXPECTED. (Injected only at deploy time? Check the deployed HTML instead.)"
+      "firebase_core_web $FB_VERSION is used but neither web/index.html nor build/web/index.html preloads its bundles. The SDK is import()ed only after the app's wasm runs (firebase-app.js strictly first); if main() awaits Firebase.initializeApp, that chain is on the first-frame path. On Blink only, modulepreload https://www.gstatic.com/firebasejs/$FB_VERSION/<bundle> (bare, no crossorigin) for: $FB_EXPECTED. (Injected only at deploy time? Check the deployed HTML instead.)"
   else
-    FB_LINKS="$(html_tag_stream "$FB_SRC" | grep -Ei '^link[[:space:]]' | grep -i 'modulepreload' | grep 'gstatic\.com/firebasejs/')"
-    FB_FOUND_VERSIONS="$(printf '%s\n' "$FB_LINKS" | grep -oE 'firebasejs/[0-9.]+/' | sort -u | sed 's#firebasejs/##; s#/##' | tr '\n' ' ')"
+    FB_URLS="$(grep -oE 'gstatic\.com/firebasejs/[0-9.]+/firebase-[a-z0-9-]+\.js' "$FB_SRC" | sort -u)"
+    FB_FOUND_VERSIONS="$(printf '%s\n' "$FB_URLS" | grep -oE 'firebasejs/[0-9.]+/' | sort -u | sed 's#firebasejs/##; s#/##' | tr '\n' ' ')"
     FB_MISSING=""
     for b in $FB_EXPECTED; do
-      printf '%s\n' "$FB_LINKS" | grep -q "firebasejs/$FB_VERSION/$b" || FB_MISSING="$FB_MISSING $b"
+      printf '%s\n' "$FB_URLS" | grep -q "firebasejs/$FB_VERSION/$b" || FB_MISSING="$FB_MISSING $b"
     done
     if [ "${FB_FOUND_VERSIONS% }" != "$FB_VERSION" ]; then
       check_warn "Stale Firebase modulepreloads" \
@@ -612,11 +618,11 @@ if [ -n "$FB_CORE_ROOT" ] && [ -f "$FB_CORE_ROOT/lib/src/firebase_sdk_version.da
       check_warn "Incomplete Firebase modulepreloads" \
         "Missing modulepreload for:$FB_MISSING (registered services in the resolved firebase_*_web packages)."
     else
-      check_pass "Firebase JS SDK $FB_VERSION bundles are modulepreloaded ($(basename "$(dirname "$FB_SRC")")/index.html)"
+      check_pass "Firebase JS SDK $FB_VERSION bundles are preloaded ($(basename "$(dirname "$FB_SRC")")/index.html; confirm they sit in the Blink-only branch)"
     fi
-    if printf '%s\n' "$FB_LINKS" | grep -qi 'crossorigin'; then
+    if html_tag_stream "$FB_SRC" | grep -Ei '^link[[:space:]]' | grep 'gstatic\.com/firebasejs/' | grep -qi 'crossorigin'; then
       check_warn "Firebase modulepreload crossorigin" \
-        "Firebase modulepreloads carry a crossorigin attribute; the SDK's dynamic import() is credentials-mode same-origin, so a mismatched preload is fetched twice. Use bare <link rel=\"modulepreload\" href=...>."
+        "Firebase modulepreloads carry a crossorigin attribute; the SDK's dynamic import() is credentials-mode same-origin, so a mismatched preload is fetched twice. Use bare modulepreloads."
     fi
   fi
 fi

@@ -44,7 +44,8 @@ Keep the pre-Flutter splash (plain HTML/CSS) in `index.html`; remove it after `r
 1. **Serve a real loading indicator** (HTML/CSS, not Flutter). A 3–5 s white screen reads as broken; a branded splash reads as loading.
 2. **Preload the entrypoint the loader will actually pick** (section 4) and `preconnect` to third-party origins on the critical path.
 3. **Defer non-critical work** with Dart `deferred as` imports so route code is fetched on demand.
-4. **Don't block the first frame on network.** Resolve auth/tenant/remote-config after the first frame where possible; a splash that waits on a slow API is a splash that hangs. If you *must* await something before `runApp`, make sure its fetches start at HTML-parse time (section 3).
+4. **Add a first-frame watchdog.** Loader errors are easy to catch; a boot that downloads everything and then never paints (a hang inside startup, a lost GPU context, stale client state that throws nothing) leaves users on the splash forever. In the bootstrap, start a clock only once the app binary (`main.dart*.wasm|js`) and engine (`skwasm*.wasm` / `canvaskit.wasm`) show `responseEnd > 0` in Resource Timing; count only visible time (`document.hidden` tabs get no frames); if `flutter-first-frame` hasn't fired after ~30 s, purge service workers + Cache Storage and reload once (sessionStorage-guarded, cache-busting the entrypoints), and on a second stall show a retry screen. Slow networks never trip it because the clock starts after the downloads.
+5. **Don't block the first frame on network.** Resolve auth/tenant/remote-config after the first frame where possible; a splash that waits on a slow API is a splash that hangs. If you *must* await something before `runApp`, make sure its fetches start at HTML-parse time (section 3).
 
 ## 3. The boot critical path: hidden serial chains
 
@@ -59,13 +60,20 @@ The first frame waits for: HTML → bootstrap → entrypoint (`main.dart.mjs` + 
 
 If `main()` awaits `Firebase.initializeApp` before `runApp`, that chain sits on the first-frame critical path. On the reference app it measured **~3.6 s on throttled mobile**.
 
-**Fix: modulepreload every bundle at HTML-parse time**, so the `import()`s resolve from the module map instantly:
+**Fix: modulepreload every bundle at HTML-parse time — on Blink only**, so the `import()`s resolve from the module map instantly:
 
-```html
-<link rel="modulepreload" href="https://www.gstatic.com/firebasejs/12.19.0/firebase-app.js">
-<link rel="modulepreload" href="https://www.gstatic.com/firebasejs/12.19.0/firebase-auth.js">
-<link rel="modulepreload" href="https://www.gstatic.com/firebasejs/12.19.0/firebase-app-check.js">
+```js
+// Inside the inline boot script that already mirrors flutter.js renderer
+// selection (section 4): only the WasmGC + Blink branch.
+if (wasmGC && blink) {
+  ["https://www.gstatic.com/firebasejs/12.19.0/firebase-app.js",
+   "https://www.gstatic.com/firebasejs/12.19.0/firebase-auth.js"]
+    .forEach(function (href) { add(href, "modulepreload", null, false); });
+}
 ```
+
+- **Do not ship static `<link rel="modulepreload">` tags for these to WebKit.** FlutterFire serialises `firebase-app.js` before the service bundles *because* concurrent loading of that module graph trips a WebKit evaluation defect; preloading all of them at once at parse time reintroduces exactly that concurrency for Safari and every iOS browser. Gate them on the same Blink check your entry-point preloads use. (Lesson from production, 2026-10-01: static tags shipped to every browser; mobile/Safari users reported an endless splash and the tags were moved behind the Blink gate the same day.)
+- Measure the side effect too: Lighthouse's simulated FCP treats High-priority head scripts as render-blocking, so a block of module preloads can *raise* simulated FCP even though real browsers paint the splash immediately.
 
 - **Bare tags, no `crossorigin` attribute** — that matches the credentials mode of the SDK's dynamic `import()`; a mismatched preload is fetched twice.
 - **Never hardcode the version or the list.** Generate them at build/deploy time from the resolved packages:
